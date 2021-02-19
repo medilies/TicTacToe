@@ -4,7 +4,7 @@ class Party {
      * @param {HTMLDivElement} boardContainer
      */
     constructor(boardContainer) {
-        this.mqttLogs = true;
+        this.mqttLogs = false;
 
         this.boardContainer = boardContainer;
         this.drawStartMenu(this.boardContainer);
@@ -14,129 +14,192 @@ class Party {
      *
      * @param {HTMLDivElement} boardContainer
      */
-    drawStartMenu() {
-        this.boardContainer.innerHTML = "";
-
-        // Create start menu
-        const menu = document.createElement("form");
-        menu.id = "tictactoe-init-game";
-        this.boardContainer.appendChild(menu);
-
-        // Player name (Class property)
-        const nameInputField = document.createElement("input");
-        nameInputField.id = "tictactoe-player-name";
-        nameInputField.type = "text";
-        this.nameInputField = nameInputField;
-        menu.appendChild(this.nameInputField);
-
-        // Start party
-        const startBtn = document.createElement("button");
-        startBtn.type = "submit";
-        startBtn.innerText = "Create a party";
-        menu.appendChild(startBtn);
-
-        menu.addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            this.initGame();
-        });
-
-        // Party link (Class property)
-        const partyIdField = document.createElement("input");
-        partyIdField.id = "tictactoe-player-name";
-        partyIdField.type = "text";
-        this.partyIdInputField = partyIdField;
-        menu.appendChild(this.partyIdInputField);
-
-        // Join party
-        const joinBtn = document.createElement("button");
-        joinBtn.innerText = "Join a party";
-        menu.appendChild(joinBtn);
-        this.boardContainer.appendChild(joinBtn);
-
-        joinBtn.addEventListener("click", () => {
-            this.joinGame();
-        });
-    }
 
     initGame() {
-        this.userName = this.nameInputField.value;
-        this.PartyID = this.userName + Date.now();
-        this.partyTopic = `tictactoe/${this.PartyID}/#`;
-        this.partyTopicSubscriptions = JSON.parse(
-            `{"${this.partyTopic}": {"qos":2}}`
-        );
-        this.pubTopic = `tictactoe/${this.PartyID}/${this.userName}`;
-
-        this.mySymbole = "X";
-        this.otherSymbole = "O";
-
+        this.setUserName();
+        this.setPartyIdOnInit();
+        this.setPartySubTopic();
+        this.setXOPubTopic();
+        this.unlockTurn();
+        this.setSymbols("X", "O");
+        this.initGameState();
+        this.setOpponentUserName("unknown*");
         this.connect();
         this.mqttCallbacks();
         this.makeBoard(this.boardContainer);
+        this.displayPartyCodeForOwner();
+    }
 
+    joinGame() {
+        this.setUserName();
+        this.setPartyIdOnJoin();
+        this.setPartySubTopic();
+        this.setXOPubTopic();
+        this.lockTurn();
+        this.setSymbols("O", "X");
+        this.initGameState();
+        this.setOpponentUserName("unknown*");
+        this.connect();
+        this.mqttCallbacks();
+        this.pubHi();
+        this.makeBoard(this.boardContainer);
+    }
+
+    setUserName() {
+        this.userName = this.nameInputField.value;
+    }
+
+    setPartyIdOnInit() {
+        this.PartyID = this.userName + Date.now();
+    }
+
+    setPartyIdOnJoin() {
+        this.PartyID = this.partyIdInputField.value;
+    }
+
+    setOpponentUserName(opponentUserName) {
+        this.opponentUserName = opponentUserName;
+    }
+
+    setSymbols(local, remote) {
+        this.localSymbol = local;
+        this.remoteSymbol = remote;
+    }
+
+    // ***********************
+    // game state
+    // ***********************
+
+    initGameState() {
+        this.gameState = ["", "", "", "", "", "", "", "", ""];
+    }
+
+    updateGameState(target, symbole) {
+        this.gameState[target] = symbole;
+    }
+
+    checkGameWinner() {
+        const g = this.gameState;
+        console.log(g);
+        // horizontal
+        if (g[0] === g[1] && g[0] === g[2]) {
+            if (g[0] === this.localSymbol) this.win();
+            else if (g[0] === this.remoteSymbol) this.lose();
+        } else if (g[3] === g[4] && g[3] === g[5]) {
+            if (g[3] === this.localSymbol) this.win();
+            else if (g[3] === this.remoteSymbol) this.lose();
+        } else if (g[6] === g[7] && g[6] === g[8]) {
+            if (g[6] === this.localSymbol) this.win();
+            else if (g[6] === this.remoteSymbol) this.lose();
+        }
+        // vertical
+        else if (g[0] === g[3] && g[0] === g[6]) {
+            if (g[0] === this.localSymbol) this.win();
+            else if (g[0] === this.remoteSymbol) this.lose();
+        } else if (g[1] === g[4] && g[1] === g[7]) {
+            if (g[1] === this.localSymbol) this.win();
+            else if (g[1] === this.remoteSymbol) this.lose();
+        } else if (g[2] === g[5] && g[2] === g[8]) {
+            if (g[2] === this.localSymbol) this.win();
+            else if (g[2] === this.remoteSymbol) this.lose();
+        }
+        // Diagonal
+        else if (g[0] === g[4] && g[0] === g[8]) {
+            if (g[0] === this.localSymbol) this.win();
+            else if (g[0] === this.remoteSymbol) this.lose();
+        } else if (g[2] === g[4] && g[2] === g[6]) {
+            if (g[2] === this.localSymbol) this.win();
+            else if (g[2] === this.remoteSymbol) this.lose();
+        }
+    }
+
+    win() {
+        this.lockTurn();
+        this.initGameState();
+        console.log("win");
+    }
+
+    lose() {
+        this.lockTurn();
+        this.initGameState();
+        console.log("die");
+    }
+
+    lockTurn() {
+        this.turn = "locked";
+    }
+
+    unlockTurn() {
+        this.turn = "unlocked";
+    }
+
+    // ***********************
+    // UI
+    // ***********************
+    displayPartyCodeForOwner() {
         const inv = document.createElement("p");
         inv.innerText = this.PartyID;
         this.boardContainer.appendChild(inv);
     }
 
-    joinGame() {
-        this.userName = this.nameInputField.value;
-        this.PartyID = this.partyIdInputField.value;
-        this.partyTopic = `tictactoe/${this.PartyID}/#`;
-        this.partyTopicSubscriptions = JSON.parse(
-            `{"${this.partyTopic}": {"qos":2}}`
-        );
-        this.pubTopic = `tictactoe/${this.PartyID}/${this.userName}`;
-
-        this.mySymbole = "O";
-        this.otherSymbole = "X";
-
-        this.connect();
-        this.mqttCallbacks();
-        this.makeBoard(this.boardContainer);
+    drawStartMenu() {
+        this.boardContainer.innerHTML = "";
+        this.appendStartMenu(this.boardContainer);
+        this.appendJoinMenu(this.boardContainer);
     }
 
-    connect() {
-        this.MQTTConnection = mqtt.connect({
-            protocol: "ws",
-            host: "test.mosquitto.org",
-            port: 8080,
-            username: this.userName,
-            clientId: this.userName,
-            path: "/mqtt",
+    appendStartMenu(parent) {
+        // Create start menu
+        const menu = document.createElement("form");
+        menu.id = "tictactoe-init-game";
+        parent.appendChild(menu);
+
+        this.appentNameInputField(menu);
+        this.appendCreatePartyBtn(menu);
+
+        menu.addEventListener("submit", (e) => {
+            e.preventDefault();
+            this.initGame();
         });
     }
 
-    mqttCallbacks() {
-        this.MQTTConnection.on("connect", () => {
-            this.MQTTConnection.subscribe(
-                this.partyTopicSubscriptions,
-                (err, grant) => {
-                    if (err) console.warn("SUBSCRIBE ERROR:", err);
-                    if (this.mqttLogs) console.log("SUBSCRIBED TO :", grant);
-                }
-            );
-        });
+    appendJoinMenu(parent) {
+        this.appendPartyIdInputField(parent);
+        this.appendJoinPartyBtn(parent);
 
-        this.MQTTConnection.on("message", (topic, message) => {
-            const msg = message.toString();
-            console.log(topic, "<<>>", msg);
+        // Join party
+    }
 
-            const sender = topic.split("/")[2];
+    appentNameInputField(parent) {
+        const nameInputField = document.createElement("input");
+        nameInputField.type = "text";
+        parent.appendChild(nameInputField);
 
-            console.log(sender);
-            console.log(this.userName);
+        this.nameInputField = nameInputField;
+    }
 
-            if (sender !== this.userName) {
-                //
-                document.querySelector("#" + msg).innerText = this.otherSymbole;
-                this.lockturn = false;
-            }
-        });
+    appendCreatePartyBtn(parent) {
+        const startBtn = document.createElement("button");
+        startBtn.type = "submit";
+        startBtn.innerText = "Create a party";
+        parent.appendChild(startBtn);
+    }
 
-        this.MQTTConnection.on("packetsend", (packet) => {
-            console.log("sent:    ", packet);
+    appendPartyIdInputField(parent) {
+        const partyIdField = document.createElement("input");
+        partyIdField.type = "text";
+        parent.appendChild(partyIdField);
+
+        this.partyIdInputField = partyIdField;
+    }
+
+    appendJoinPartyBtn(parent) {
+        const joinBtn = document.createElement("button");
+        joinBtn.innerText = "Join a party";
+        parent.appendChild(joinBtn);
+
+        joinBtn.addEventListener("click", () => {
+            this.joinGame();
         });
     }
 
@@ -149,37 +212,132 @@ class Party {
 
         const board = document.createElement("div");
         board.style.display = "grid";
+        board.style.gap = "0.2rem";
         board.style.gridTemplateRows = "repeat(3, 75px)";
         board.style.gridTemplateColumns = "repeat(3, 75px)";
+        board.style.background = "#ccc";
+        board.style.width = "fit-content";
+        board.style.width = "max-content";
 
         for (let i = 0; i < 9; i++) {
             const div = document.createElement("div");
-            div.id = "gamesquare-" + i;
-            div.setAttribute("xo-square", "");
-            div.style.border = "1px solid #333";
+            div.id = "xo-gamesquare-" + i;
+            div.setAttribute("xo-gamesquare", "");
+            div.style.background = "#fff";
             board.appendChild(div);
         }
 
         this.boardContainer.appendChild(board);
 
         board.addEventListener("click", (e) => {
-            if (e.target.hasAttribute("xo-square") && !this.lockturn) {
-                this.drawXO(e.target);
-                this.MQTTConnection.publish(this.pubTopic, e.target.id, {
-                    qos: 2,
-                });
+            if (
+                this.opponentUserName !== "unknown*" &&
+                e.target.hasAttribute("xo-gamesquare") &&
+                this.turn === "unlocked"
+            ) {
+                this.lockTurn();
+
+                this.pubXO(e.target.id[14]);
             }
         });
     }
 
-    drawXO(target) {
-        target.innerText = this.mySymbole;
-        this.lockturn = true;
+    drawSymbol(target, symbol) {
+        const targetElement = document.querySelector(
+            "#xo-gamesquare-" + target
+        );
+        targetElement.innerText = symbol;
     }
 
-    lockOponnentId() {}
+    // ***********************
+    // MQTT
+    // ***********************
+    connect() {
+        this.MQTTConnection = mqtt.connect({
+            protocol: "ws",
+            host: "127.0.0.1",
+            port: 8080,
+            username: this.userName,
+            clientId: this.userName,
+            // path: "/mqtt",
+        });
+    }
+
+    mqttCallbacks() {
+        this.MQTTConnection.on("connect", () => {
+            this.MQTTConnection.subscribe(
+                this.partyTopicSubscriptions,
+                (err, grant) => {
+                    if (this.mqttLogs) {
+                        if (err) console.warn("SUBSCRIBE ERROR:", err);
+                        console.log("SUBSCRIBED TO :", grant);
+                    }
+                }
+            );
+        });
+
+        this.MQTTConnection.on("message", (topic, message) => {
+            const msg = message.toString();
+            const sender = topic.split("/")[2];
+
+            // log
+            if (this.mqttLogs) console.log(topic, "<<>>", msg);
+
+            this.MQTTConnection.on("packetsend", (packet) => {
+                // log
+                if (this.mqttLogs) console.log("sent:    ", packet);
+            });
+
+            // XO exchanges
+            if (
+                this.opponentUserName !== "unknown*" &&
+                sender === this.opponentUserName &&
+                !isNaN(msg)
+            ) {
+                this.drawSymbol(msg, this.remoteSymbol);
+                this.updateGameState(msg, this.remoteSymbol);
+                this.unlockTurn();
+                this.checkGameWinner();
+            } else if (sender === this.userName && !isNaN(msg)) {
+                this.drawSymbol(msg, this.localSymbol);
+                this.updateGameState(msg, this.localSymbol);
+                this.checkGameWinner();
+            }
+            // Handshake
+            else if (
+                this.opponentUserName === "unknown*" &&
+                msg === "hi" &&
+                sender
+            ) {
+                this.setOpponentUserName(sender);
+                this.pubHi();
+            }
+        });
+    }
+
+    pubXO(squareNb) {
+        const qos = { qos: 2 };
+        this.MQTTConnection.publish(this.xoPubTopic, squareNb, qos);
+    }
+
+    pubHi() {
+        if (this.hiSent) return;
+        const qos = { qos: 2 };
+        this.MQTTConnection.publish(this.xoPubTopic, "hi", qos);
+        this.hiSent = true;
+    }
+
+    setPartySubTopic() {
+        this.partyTopicSubscriptions = JSON.parse(
+            `{"tictactoe/${this.PartyID}/#": {"qos":2}}`
+        );
+    }
+
+    setXOPubTopic() {
+        this.xoPubTopic = `tictactoe/${this.PartyID}/${this.userName}`;
+    }
 }
 
-const board = document.querySelector("#tictactoe-container");
+const board = document.querySelector("#xo-container");
 
 const party = new Party(board);
