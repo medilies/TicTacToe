@@ -2,9 +2,9 @@
  * @property **boardContainer** refrenced via the constructor
  * @property **nameInputField** used by other classes
  * @property **partyIdInputField** used by other classes
- * @property **startMenu** form - REQUIRES submit event handler: to call initGame procedure
+ * @property **startMenu** form - REQUIRES submit event handler: to call initParty procedure
  * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
- * @property **joinBtn** - REQUIRES click event handler: to call joinGame procedure
+ * @property **joinBtn** - REQUIRES click event handler: to call joinParty procedure
  *
  */
 class UI {
@@ -22,7 +22,6 @@ class UI {
     drawStartMenu() {
         this.boardContainer.innerHTML = "";
         this.appendStartMenu(this.boardContainer);
-        this.appendJoinMenu(this.boardContainer);
     }
 
     /**
@@ -53,17 +52,28 @@ class UI {
     }
 
     appendStartMenu(parent) {
-        this.startMenu = document.createElement("form");
-        this.startMenu.id = "tictactoe-init-game";
-        parent.appendChild(this.startMenu);
+        const startMenu = document.createElement("div");
 
-        this.appentNameInputField(this.startMenu);
-        this.appendCreatePartyBtn(this.startMenu);
+        this.appendStartPartyMenu(startMenu);
+        this.appendJoinPartyMenu(startMenu);
+
+        parent.appendChild(startMenu);
     }
 
-    appendJoinMenu(parent) {
-        this.appendPartyIdInputField(parent);
-        this.appendJoinPartyBtn(parent);
+    appendStartPartyMenu(parent) {
+        const startPartyMenu = document.createElement("div");
+
+        this.appentNameInputField(startPartyMenu);
+        this.appendCreatePartyBtn(startPartyMenu);
+
+        parent.appendChild(startPartyMenu);
+    }
+
+    appendJoinPartyMenu(parent) {
+        const joinPartyMenu = document.createElement("div");
+        this.appendPartyIdInputField(joinPartyMenu);
+        this.appendJoinPartyBtn(joinPartyMenu);
+        parent.appendChild(joinPartyMenu);
     }
 
     appentNameInputField(parent) {
@@ -73,10 +83,9 @@ class UI {
     }
 
     appendCreatePartyBtn(parent) {
-        const startBtn = document.createElement("button");
-        startBtn.type = "submit";
-        startBtn.innerText = "Create a party";
-        parent.appendChild(startBtn);
+        this.startBtn = document.createElement("button");
+        this.startBtn.innerText = "Create a party";
+        parent.appendChild(this.startBtn);
     }
 
     appendPartyIdInputField(parent) {
@@ -243,7 +252,6 @@ class MQTT {
     }
 
     pubXO(squareNb) {
-        console.log("yo");
         const qos = { qos: 2 };
         this.mqttConnection.publish(this.partyPubTopic, squareNb, qos);
     }
@@ -264,13 +272,28 @@ class Game {
     constructor(boardContainer) {
         this.boardContainer = boardContainer;
         this.ui = new UI(boardContainer);
-        //
-        this.ui.startMenu.addEventListener("submit", (e) => {
-            e.preventDefault();
-            this.initGame();
+        this.uiAttachStartMenuEventHandler();
+    }
+
+    uiAttachStartMenuEventHandler() {
+        this.ui.startBtn.addEventListener("click", (e) => {
+            this.initParty();
         });
         this.ui.joinBtn.addEventListener("click", () => {
-            this.joinGame();
+            this.joinParty();
+        });
+    }
+
+    uiAttachXOGridBoardEventHandler() {
+        this.ui.xoGridBoard.addEventListener("click", (e) => {
+            if (
+                this.opponentUserName !== "unknown*" &&
+                e.target.hasAttribute("xo-gamesquare") &&
+                this.round.turnState === "unlocked"
+            ) {
+                this.round.lockTurn();
+                this.mqtt.pubXO(e.target.id[14]);
+            }
         });
     }
 
@@ -278,7 +301,7 @@ class Game {
      *
      * @param {HTMLDivElement} boardContainer
      */
-    initGame() {
+    initParty() {
         this.setUserName();
         this.setPartyIdOnInit();
         this.setSymbols("X", "O");
@@ -287,52 +310,13 @@ class Game {
         this.round.unlockTurn();
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
-        this.mqtt.mqttConnection.on("message", (topic, message) => {
-            const msg = message.toString();
-            const sender = topic.split("/")[2];
-
-            // log
-            if (this.mqtt.mqttLogs) console.log(topic, "<<>>", msg);
-
-            // XO exchanges
-            if (
-                this.opponentUserName !== "unknown*" &&
-                sender === this.opponentUserName &&
-                !isNaN(msg)
-            ) {
-                this.ui.drawSymbol(msg, this.remoteSymbol);
-                this.round.updateRoundState(msg, this.remoteSymbol);
-                this.round.unlockTurn();
-            } else if (sender === this.userName && !isNaN(msg)) {
-                this.ui.drawSymbol(msg, this.localSymbol);
-                this.round.updateRoundState(msg, this.localSymbol);
-            }
-            // Handshake
-            else if (
-                this.opponentUserName === "unknown*" &&
-                msg === "hi" &&
-                sender
-            ) {
-                this.setOpponentUserName(sender);
-                this.mqtt.pubHi();
-            }
-        });
+        this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.ui.makeXOGridBoard(this.boardContainer);
-        // add evend listeners
-        this.ui.xoGridBoard.addEventListener("click", (e) => {
-            if (
-                this.opponentUserName !== "unknown*" &&
-                e.target.hasAttribute("xo-gamesquare") &&
-                this.round.turnState === "unlocked"
-            ) {
-                this.round.lockTurn();
-                this.mqtt.pubXO(e.target.id[14]);
-            }
-        });
         this.ui.displayPartyCodeForOwner(this.partyId);
+        this.uiAttachXOGridBoardEventHandler();
     }
 
-    joinGame() {
+    joinParty() {
         this.setUserName();
         this.setPartyIdOnJoin();
         this.setSymbols("O", "X");
@@ -341,48 +325,10 @@ class Game {
         this.round.lockTurn();
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
-        this.mqtt.mqttConnection.on("message", (topic, message) => {
-            const msg = message.toString();
-            const sender = topic.split("/")[2];
-
-            // log
-            if (this.mqtt.mqttLogs) console.log(topic, "<<>>", msg);
-
-            // XO exchanges
-            if (
-                this.opponentUserName !== "unknown*" &&
-                sender === this.opponentUserName &&
-                !isNaN(msg)
-            ) {
-                this.ui.drawSymbol(msg, this.remoteSymbol);
-                this.round.updateRoundState(msg, this.remoteSymbol);
-                this.round.unlockTurn();
-            } else if (sender === this.userName && !isNaN(msg)) {
-                this.ui.drawSymbol(msg, this.localSymbol);
-                this.round.updateRoundState(msg, this.localSymbol);
-            }
-            // Handshake
-            else if (
-                this.opponentUserName === "unknown*" &&
-                msg === "hi" &&
-                sender
-            ) {
-                this.setOpponentUserName(sender);
-                this.mqtt.pubHi();
-            }
-        });
+        this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.mqtt.pubHi();
         this.ui.makeXOGridBoard(this.boardContainer);
-        this.ui.xoGridBoard.addEventListener("click", (e) => {
-            if (
-                this.opponentUserName !== "unknown*" &&
-                e.target.hasAttribute("xo-gamesquare") &&
-                this.round.turnState === "unlocked"
-            ) {
-                this.round.lockTurn();
-                this.mqtt.pubXO(e.target.id[14]);
-            }
-        });
+        this.uiAttachXOGridBoardEventHandler();
     }
 
     setUserName() {
@@ -404,6 +350,52 @@ class Game {
 
     setOpponentUserName(opponentUserName) {
         this.opponentUserName = opponentUserName;
+    }
+
+    /**
+     * Uses the 3 following calsses
+     *
+     * - UI
+     * - Round
+     * - MQTT
+     * @param {*} mqttConnection
+     */
+    mqttOnMsgEventHandler(mqttConnection) {
+        mqttConnection.on("message", (topic, message) => {
+            const msg = message.toString();
+            const sender = topic.split("/")[2];
+
+            // log
+            if (this.mqtt.mqttLogs) console.log(topic, "<<>>", msg);
+
+            // - XO exchanges:
+
+            // - - User's play
+            if (sender === this.userName && !isNaN(msg)) {
+                this.ui.drawSymbol(msg, this.localSymbol);
+                this.round.updateRoundState(msg, this.localSymbol);
+            }
+            // - - Opponent's play
+            else if (
+                this.opponentUserName !== "unknown*" &&
+                sender === this.opponentUserName &&
+                !isNaN(msg)
+            ) {
+                this.ui.drawSymbol(msg, this.remoteSymbol);
+                this.round.updateRoundState(msg, this.remoteSymbol);
+                this.round.unlockTurn();
+            }
+
+            // - Handshake
+            else if (
+                this.opponentUserName === "unknown*" &&
+                msg === "hi" &&
+                sender
+            ) {
+                this.setOpponentUserName(sender);
+                this.mqtt.pubHi();
+            }
+        });
     }
 }
 
