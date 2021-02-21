@@ -3,8 +3,10 @@
  * @property **nameInputField** used by other classes
  * @property **partyIdInputField** used by other classes
  * @property **startMenu** form - REQUIRES submit event handler: to call initParty procedure
- * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
  * @property **joinBtn** - REQUIRES click event handler: to call joinParty procedure
+ * @property **localScoreElement**
+ * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
+ * @property **opponentScoreElement**
  *
  */
 class UI {
@@ -19,45 +21,18 @@ class UI {
         this.drawStartMenu();
     }
 
+    //**********************************************
+    // START MENU
+    //**********************************************
     drawStartMenu() {
         this.boardContainer.innerHTML = "";
-        this.appendStartMenu(this.boardContainer);
-    }
 
-    /**
-     *
-     * @param {HTMLDivElement} boardContainer
-     */
-    makeXOGridBoard() {
-        this.boardContainer.innerHTML = "";
-
-        this.xoGridBoard = document.createElement("div");
-        this.xoGridBoard.style.display = "grid";
-        this.xoGridBoard.style.gap = "0.2rem";
-        this.xoGridBoard.style.gridTemplateRows = "repeat(3, 100px)";
-        this.xoGridBoard.style.gridTemplateColumns = "repeat(3, 100px)";
-        this.xoGridBoard.style.background = "#ccc";
-        this.xoGridBoard.style.width = "fit-content";
-        this.xoGridBoard.style.width = "max-content";
-
-        for (let i = 0; i < 9; i++) {
-            const div = document.createElement("div");
-            div.id = "xo-gamesquare-" + i;
-            div.setAttribute("xo-gamesquare", "");
-            div.style.background = "#fff";
-            this.xoGridBoard.appendChild(div);
-        }
-
-        this.boardContainer.appendChild(this.xoGridBoard);
-    }
-
-    appendStartMenu(parent) {
         const startMenu = document.createElement("div");
 
         this.appendStartPartyMenu(startMenu);
         this.appendJoinPartyMenu(startMenu);
 
-        parent.appendChild(startMenu);
+        this.boardContainer.appendChild(startMenu);
     }
 
     appendStartPartyMenu(parent) {
@@ -71,8 +46,10 @@ class UI {
 
     appendJoinPartyMenu(parent) {
         const joinPartyMenu = document.createElement("div");
+
         this.appendPartyIdInputField(joinPartyMenu);
         this.appendJoinPartyBtn(joinPartyMenu);
+
         parent.appendChild(joinPartyMenu);
     }
 
@@ -100,10 +77,89 @@ class UI {
         parent.appendChild(this.joinBtn);
     }
 
+    //**********************************************
+    // PARTY SCREEN
+    //**********************************************
+    drawPartyScreen(userName, Localsymbol, partyId = undefined) {
+        this.boardContainer.innerHTML = "";
+
+        this.appendlocalPlayerCard(userName, Localsymbol);
+        this.appendXOGridBoard();
+        this.appendEmptyOpponentArea();
+
+        if (partyId !== undefined) this.displayPartyCodeForOwner(partyId);
+    }
+
+    appendXOGridBoard() {
+        this.xoGridBoard = document.createElement("div");
+        this.xoGridBoard.style.display = "grid";
+        this.xoGridBoard.style.gap = "0.2rem";
+        this.xoGridBoard.style.gridTemplateRows = "repeat(3, 100px)";
+        this.xoGridBoard.style.gridTemplateColumns = "repeat(3, 100px)";
+        this.xoGridBoard.style.background = "#ccc";
+        this.xoGridBoard.style.width = "fit-content";
+        this.xoGridBoard.style.width = "max-content";
+
+        for (let i = 0; i < 9; i++) {
+            const div = document.createElement("div");
+            div.id = "xo-gamesquare-" + i;
+            div.setAttribute("xo-gamesquare", "");
+            div.style.background = "#fff";
+            this.xoGridBoard.appendChild(div);
+        }
+
+        this.boardContainer.appendChild(this.xoGridBoard);
+    }
+
+    appendlocalPlayerCard(userName, Localsymbol) {
+        this.localScoreElement = document.createElement("p");
+        const localPlayerCard = this.createPlayerCard(
+            userName,
+            Localsymbol,
+            this.localScoreElement
+        );
+
+        this.boardContainer.appendChild(localPlayerCard);
+    }
+
+    appendEmptyOpponentArea() {
+        this.opponentElement = document.createElement("div");
+        this.boardContainer.appendChild(this.opponentElement);
+    }
+
+    displayOpponentPlayerCrad(opponentName, opponentSymbol) {
+        this.opponentScoreElement = document.createElement("p");
+        const remotePlayerCard = this.createPlayerCard(
+            opponentName,
+            opponentSymbol,
+            this.opponentScoreElement
+        );
+
+        this.opponentElement.innerHTML = "";
+        this.opponentElement.appendChild(remotePlayerCard);
+    }
+
+    createPlayerCard(userName, symbol, scoreElement) {
+        const playerCard = document.createElement("div");
+
+        const playerName = document.createElement("p");
+        playerName.innerText = userName;
+        playerCard.appendChild(playerName);
+
+        const playerSymbol = document.createElement("p");
+        playerSymbol.innerText = symbol;
+        playerCard.appendChild(playerSymbol);
+
+        scoreElement.innerText = "Score: 0";
+        playerCard.appendChild(scoreElement);
+
+        return playerCard;
+    }
+
     displayPartyCodeForOwner(partyID) {
         const inv = document.createElement("p");
-        inv.innerText = partyID;
-        this.boardContainer.appendChild(inv);
+        inv.innerText = "Share the party code with one friend: " + partyID;
+        this.opponentElement.appendChild(inv);
     }
 
     drawSymbol(target, symbol) {
@@ -201,6 +257,7 @@ class Round {
  * @property partySubTopic
  * @property partyPubTopic
  * @property {bool} hiSent
+ * @property {bool} subscribed
  * @property {bool} mqttLogs
  */
 class MQTT {
@@ -210,7 +267,7 @@ class MQTT {
         this.partyId = partyId;
         this.connect();
         this.setPartySubTopic();
-        this.setXOPubTopic();
+        this.setPartyPubTopic();
         this.mqttCallbacks();
     }
 
@@ -231,20 +288,23 @@ class MQTT {
         );
     }
 
-    setXOPubTopic() {
+    setPartyPubTopic() {
         this.partyPubTopic = `tictactoe/${this.partyId}/${this.userName}`;
     }
 
     mqttCallbacks() {
+        // connection and subscribtion
         this.mqttConnection.on("connect", () => {
             this.mqttConnection.subscribe(this.partySubTopic, (err, grant) => {
                 if (this.mqttLogs) {
-                    if (err) console.warn("SUBSCRIBE ERROR:", err);
+                    if (err) throw ("SUBSCRIBE ERROR:", err);
+                    this.subscribed = true;
                     console.log("SUBSCRIBED TO :", grant);
                 }
             });
         });
 
+        // Sent massages
         // this.mqttConnection.on("packetsend", (packet) => {
         //     // log
         //     if (this.mqttLogs) console.log("sent:    ", packet);
@@ -258,9 +318,16 @@ class MQTT {
 
     pubHi() {
         if (this.hiSent) return;
-        const qos = { qos: 2 };
-        this.mqttConnection.publish(this.partyPubTopic, "hi", qos);
-        this.hiSent = true;
+        // if this client is a joiner make sure it subscribed to party topic and can hear the echo of his "hi" to set this.hiSent to true to avoid more than (2)*hi in handshake
+        // pubHI will only get delayed if subscribtion isn't confirmed
+        if (!this.subscribed)
+            setTimeout(() => {
+                this.pubHi();
+            }, 500);
+        else {
+            const qos = { qos: 2 };
+            this.mqttConnection.publish(this.partyPubTopic, "hi", qos);
+        }
     }
 }
 
@@ -311,8 +378,7 @@ class Game {
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
-        this.ui.makeXOGridBoard(this.boardContainer);
-        this.ui.displayPartyCodeForOwner(this.partyId);
+        this.ui.drawPartyScreen(this.userName, this.localSymbol, this.partyId);
         this.uiAttachXOGridBoardEventHandler();
     }
 
@@ -327,7 +393,7 @@ class Game {
         this.mqtt = new MQTT(this.userName, this.partyId);
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.mqtt.pubHi();
-        this.ui.makeXOGridBoard(this.boardContainer);
+        this.ui.drawPartyScreen(this.userName, this.localSymbol, undefined);
         this.uiAttachXOGridBoardEventHandler();
     }
 
@@ -388,11 +454,21 @@ class Game {
 
             // - Handshake
             else if (
+                msg === "hi" &&
+                sender === this.userName &&
+                !this.mqtt.hiSent
+            ) {
+                this.mqtt.hiSent = true;
+            } else if (
                 this.opponentUserName === "unknown*" &&
                 msg === "hi" &&
                 sender
             ) {
                 this.setOpponentUserName(sender);
+                this.ui.displayOpponentPlayerCrad(
+                    this.opponentUserName,
+                    this.remoteSymbol
+                );
                 this.mqtt.pubHi();
             }
         });
