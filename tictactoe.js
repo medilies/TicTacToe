@@ -28,6 +28,7 @@ class UI {
         this.boardContainer.innerHTML = "";
 
         const startMenu = document.createElement("div");
+        startMenu.id = "xo-startMenu";
 
         this.appendStartPartyMenu(startMenu);
         this.appendJoinPartyMenu(startMenu);
@@ -37,6 +38,7 @@ class UI {
 
     appendStartPartyMenu(parent) {
         const startPartyMenu = document.createElement("div");
+        startPartyMenu.id = "xo-startPartyMenu";
 
         this.appentNameInputField(startPartyMenu);
         this.appendCreatePartyBtn(startPartyMenu);
@@ -46,6 +48,7 @@ class UI {
 
     appendJoinPartyMenu(parent) {
         const joinPartyMenu = document.createElement("div");
+        joinPartyMenu.id = "xo-joinPartyMenu";
 
         this.appendPartyIdInputField(joinPartyMenu);
         this.appendJoinPartyBtn(joinPartyMenu);
@@ -56,24 +59,30 @@ class UI {
     appentNameInputField(parent) {
         this.nameInputField = document.createElement("input");
         this.nameInputField.type = "text";
+        this.nameInputField.placeholder = "player Name";
+        this.nameInputField.classList.add("input", "long-input");
         parent.appendChild(this.nameInputField);
     }
 
     appendCreatePartyBtn(parent) {
         this.startBtn = document.createElement("button");
         this.startBtn.innerText = "Create a party";
+        this.startBtn.classList.add("btn", "long-btn");
         parent.appendChild(this.startBtn);
     }
 
     appendPartyIdInputField(parent) {
         this.partyIdInputField = document.createElement("input");
         this.partyIdInputField.type = "text";
+        this.partyIdInputField.placeholder = "Party code";
+        this.partyIdInputField.classList.add("input", "short-input");
         parent.appendChild(this.partyIdInputField);
     }
 
     appendJoinPartyBtn(parent) {
         this.joinBtn = document.createElement("button");
         this.joinBtn.innerText = "Join a party";
+        this.joinBtn.classList.add("btn", "short-btn");
         parent.appendChild(this.joinBtn);
     }
 
@@ -81,37 +90,33 @@ class UI {
     // PARTY SCREEN
     //**********************************************
     drawPartyScreen(userName, Localsymbol, partyId = undefined) {
+        const partyScreen = document.createElement("div");
+        partyScreen.id = "xo-partyScreen";
         this.boardContainer.innerHTML = "";
+        this.boardContainer.appendChild(partyScreen);
 
-        this.appendlocalPlayerCard(userName, Localsymbol);
-        this.appendXOGridBoard();
-        this.appendEmptyOpponentArea();
+        this.appendlocalPlayerCard(partyScreen, userName, Localsymbol);
+        this.appendXOGridBoard(partyScreen);
+        this.appendEmptyOpponentArea(partyScreen);
 
         if (partyId !== undefined) this.displayPartyCodeForOwner(partyId);
     }
 
-    appendXOGridBoard() {
+    appendXOGridBoard(parent) {
         this.xoGridBoard = document.createElement("div");
-        this.xoGridBoard.style.display = "grid";
-        this.xoGridBoard.style.gap = "0.2rem";
-        this.xoGridBoard.style.gridTemplateRows = "repeat(3, 100px)";
-        this.xoGridBoard.style.gridTemplateColumns = "repeat(3, 100px)";
-        this.xoGridBoard.style.background = "#ccc";
-        this.xoGridBoard.style.width = "fit-content";
-        this.xoGridBoard.style.width = "max-content";
+        this.xoGridBoard.id = "xo-gridBoard";
 
         for (let i = 0; i < 9; i++) {
             const div = document.createElement("div");
             div.id = "xo-gamesquare-" + i;
             div.setAttribute("xo-gamesquare", "");
-            div.style.background = "#fff";
             this.xoGridBoard.appendChild(div);
         }
 
-        this.boardContainer.appendChild(this.xoGridBoard);
+        parent.appendChild(this.xoGridBoard);
     }
 
-    appendlocalPlayerCard(userName, Localsymbol) {
+    appendlocalPlayerCard(parent, userName, Localsymbol) {
         this.localScoreElement = document.createElement("p");
         const localPlayerCard = this.createPlayerCard(
             userName,
@@ -119,12 +124,13 @@ class UI {
             this.localScoreElement
         );
 
-        this.boardContainer.appendChild(localPlayerCard);
+        parent.appendChild(localPlayerCard);
     }
 
-    appendEmptyOpponentArea() {
+    appendEmptyOpponentArea(parent) {
         this.opponentElement = document.createElement("div");
-        this.boardContainer.appendChild(this.opponentElement);
+        this.opponentElement.classList.add("player-card");
+        parent.appendChild(this.opponentElement);
     }
 
     displayOpponentPlayerCrad(opponentName, opponentSymbol) {
@@ -141,6 +147,7 @@ class UI {
 
     createPlayerCard(userName, symbol, scoreElement) {
         const playerCard = document.createElement("div");
+        playerCard.classList.add("player-card");
 
         const playerName = document.createElement("p");
         playerName.innerText = userName;
@@ -158,7 +165,9 @@ class UI {
 
     displayPartyCodeForOwner(partyID) {
         const inv = document.createElement("p");
+        inv.classList.add("join-code");
         inv.innerText = "Share the party code with one friend: " + partyID;
+
         this.opponentElement.appendChild(inv);
     }
 
@@ -451,7 +460,6 @@ class Game {
                 this.round.updateRoundState(msg, this.remoteSymbol);
                 this.round.unlockTurn();
             }
-
             // - Handshake
             else if (
                 msg === "hi" &&
