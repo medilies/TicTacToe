@@ -4,6 +4,7 @@
  * @property **partyIdInputField** used by other classes
  * @property **startMenu** form - REQUIRES submit event handler: to call initParty procedure
  * @property **joinBtn** - REQUIRES click event handler: to call joinParty procedure
+ * @property **playerTrunToggle**
  * @property **localScoreElement**
  * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
  * @property **opponentScoreElement**
@@ -118,12 +119,17 @@ class UI {
 
     appendlocalPlayerCard(parent, userName, Localsymbol) {
         this.localScoreElement = document.createElement("p");
+        this.playerTrunToggle = document.createElement("p");
+        this.playerTrunToggle.classList.add("turn-toggle");
+
         const localPlayerCard = this.createPlayerCard(
             userName,
             Localsymbol,
-            this.localScoreElement
+            this.localScoreElement,
+            this.playerTrunToggle
         );
 
+        localPlayerCard.appendChild(this.playerTrunToggle);
         parent.appendChild(localPlayerCard);
     }
 
@@ -150,14 +156,14 @@ class UI {
         playerCard.classList.add("player-card");
 
         const playerName = document.createElement("p");
-        playerName.innerText = userName;
+        playerName.innerHTML = `Nickname: <b>${userName}</b>`;
         playerCard.appendChild(playerName);
 
         const playerSymbol = document.createElement("p");
-        playerSymbol.innerText = symbol;
+        playerSymbol.innerHTML = `Symbol: <b>${symbol}</b>`;
         playerCard.appendChild(playerSymbol);
 
-        scoreElement.innerText = "Score: 0";
+        scoreElement.innerHTML = "Score: 0";
         playerCard.appendChild(scoreElement);
 
         return playerCard;
@@ -184,6 +190,7 @@ class UI {
  * @property remoteRoundSymbol "X" | "O"
  * @property gameState
  * @property turnState "locked" | "unlocked"
+ * @property roundResult "win" | "loss" | "tie" |undefined
  */
 class Round {
     constructor(localRoundSymbol, remoteRoundSymbol) {
@@ -193,6 +200,7 @@ class Round {
 
     initRoundState() {
         this.gameState = ["", "", "", "", "", "", "", "", ""];
+        this.roundResult = undefined;
     }
 
     updateRoundState(target, symbole) {
@@ -234,20 +242,31 @@ class Round {
         }
         // TIE
         else if (!g.includes("")) {
-            console.log("tie");
+            this.tie();
         }
     }
 
     win() {
         this.lockTurn();
         this.initRoundState();
-        console.log("win");
+        this.roundResult = "win";
     }
 
     lose() {
         this.lockTurn();
         this.initRoundState();
-        console.log("die");
+        this.roundResult = "loss";
+    }
+
+    tie() {
+        this.lockTurn();
+        this.initRoundState();
+        this.roundResult = "tie";
+    }
+
+    isPlayedTile(nb) {
+        if (this.gameState[nb] !== "") return true;
+        return false;
     }
 
     lockTurn() {
@@ -367,8 +386,10 @@ class Game {
                 e.target.hasAttribute("xo-gamesquare") &&
                 this.round.turnState === "unlocked"
             ) {
-                this.round.lockTurn();
-                this.mqtt.pubXO(e.target.id[14]);
+                const msg = e.target.id[14];
+                if (this.round.isPlayedTile(msg)) return;
+                this.roundLockTurn();
+                this.mqtt.pubXO(msg);
             }
         });
     }
@@ -383,12 +404,13 @@ class Game {
         this.setSymbols("X", "O");
         this.setOpponentUserName("unknown*");
         this.round = new Round(this.localSymbol, this.remoteSymbol);
-        this.round.unlockTurn();
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.ui.drawPartyScreen(this.userName, this.localSymbol, this.partyId);
         this.uiAttachXOGridBoardEventHandler();
+        this.roundUnlockTurn();
+        this.initscores();
     }
 
     joinParty() {
@@ -397,17 +419,24 @@ class Game {
         this.setSymbols("O", "X");
         this.setOpponentUserName("unknown*");
         this.round = new Round(this.localSymbol, this.remoteSymbol);
-        this.round.lockTurn();
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.mqtt.pubHi();
         this.ui.drawPartyScreen(this.userName, this.localSymbol, undefined);
         this.uiAttachXOGridBoardEventHandler();
+        this.roundLockTurn();
+        this.initscores();
     }
 
     setUserName() {
-        this.userName = this.ui.nameInputField.value;
+        const input = this.ui.nameInputField.value;
+        if (input === "" || input === "unknown*") {
+            const nameSrc = ["Lloyd_Gross", "Michel_Scarn", "Bestich_Manch"];
+            this.userName = nameSrc[Math.floor(Math.random() * nameSrc.length)];
+        } else {
+            this.userName = input;
+        }
     }
 
     setPartyIdOnInit() {
@@ -425,6 +454,23 @@ class Game {
 
     setOpponentUserName(opponentUserName) {
         this.opponentUserName = opponentUserName;
+    }
+
+    initscores() {
+        this.opponentScore = 0;
+        this.localScore = 0;
+    }
+
+    roundLockTurn() {
+        this.round.lockTurn();
+        this.ui.playerTrunToggle.innerText = "Wait";
+        this.ui.playerTrunToggle.style.background = "#c22";
+    }
+
+    roundUnlockTurn() {
+        this.round.unlockTurn();
+        this.ui.playerTrunToggle.innerText = "Play";
+        this.ui.playerTrunToggle.style.background = "#2c2";
     }
 
     /**
@@ -449,6 +495,8 @@ class Game {
             if (sender === this.userName && !isNaN(msg)) {
                 this.ui.drawSymbol(msg, this.localSymbol);
                 this.round.updateRoundState(msg, this.localSymbol);
+                if (this.round.roundResult !== undefined)
+                    this.roundEnd(this.round.roundResult);
             }
             // - - Opponent's play
             else if (
@@ -458,7 +506,9 @@ class Game {
             ) {
                 this.ui.drawSymbol(msg, this.remoteSymbol);
                 this.round.updateRoundState(msg, this.remoteSymbol);
-                this.round.unlockTurn();
+                this.roundUnlockTurn();
+                if (this.round.roundResult !== undefined)
+                    this.roundEnd(this.round.roundResult);
             }
             // - Handshake
             else if (
@@ -479,6 +529,22 @@ class Game {
                 );
                 this.mqtt.pubHi();
             }
+        });
+    }
+
+    roundEnd(result) {
+        if (result === "loss") {
+            this.opponentScore++;
+            this.ui.opponentScoreElement.innerHTML = `Score: <b>${this.opponentScore}</b>`;
+            this.roundLockTurn();
+        } else if (result === "win") {
+            this.localScore++;
+            this.ui.localScoreElement.innerHTML = `Score: <b>${this.localScore}</b>`;
+            this.roundUnlockTurn();
+        }
+        this.round.roundResult = undefined;
+        this.ui.xoGridBoard.childNodes.forEach((child) => {
+            child.innerHTML = "";
         });
     }
 }
