@@ -312,9 +312,9 @@ class MQTT {
 
     connect() {
         this.mqttConnection = mqtt.connect({
-            protocol: "ws",
+            protocol: "wss",
             host: "test.mosquitto.org",
-            port: 8080,
+            port: 8081,
             username: this.userName,
             clientId: this.userName,
             path: "/mqtt",
