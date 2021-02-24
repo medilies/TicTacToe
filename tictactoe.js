@@ -1,13 +1,16 @@
 /**
  * @property **boardContainer** refrenced via the constructor
- * @property **nameInputField** used by other classes
- * @property **partyIdInputField** used by other classes
- * @property **startMenu** form - REQUIRES submit event handler: to call initParty procedure
- * @property **joinBtn** - REQUIRES click event handler: to call joinParty procedure
+ * ### Start menu elements
+ * @property **nameInputField**
+ * @property **startBtn** - gets an event handeler
+ * @property **partyIdInputField**
+ * @property **joinBtn** - gets an event handeler
+ * ### Game screen
  * @property **playerTrunToggle**
  * @property **localScoreElement**
  * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
  * @property **opponentScoreElement**
+ * @property **gameSquaresIdPrfix**
  *
  */
 class UI {
@@ -182,6 +185,10 @@ class UI {
             "#" + this.gameSquaresIdPrfix + target
         );
         targetElement.innerText = symbol;
+        console.log(symbol);
+        console.log(targetElement);
+        if (symbol === "X") targetElement.style.color = "#1580D6";
+        else if (symbol === "O") targetElement.style.color = "#D61C15";
     }
 }
 
@@ -264,6 +271,10 @@ class Round {
         this.roundResult = "tie";
     }
 
+    /**
+     * Simply check if tile position is empty to avoid overriding symbols
+     * @param {Number} nb
+     */
     isPlayedTile(nb) {
         if (this.gameState[nb] !== "") return true;
         return false;
@@ -302,11 +313,11 @@ class MQTT {
     connect() {
         this.mqttConnection = mqtt.connect({
             protocol: "ws",
-            host: "127.0.0.1",
+            host: "test.mosquitto.org",
             port: 8080,
             username: this.userName,
             clientId: this.userName,
-            // path: "/mqtt",
+            path: "/mqtt",
         });
     }
 
@@ -339,7 +350,13 @@ class MQTT {
         // });
     }
 
+    /**
+     * Publish which square was played
+     * @param {number} squareNb value between 0 and 8
+     */
     pubXO(squareNb) {
+        if (!(squareNb >= 0 && squareNb <= 8))
+            throw "square number is limited inside [0-8]";
         const qos = { qos: 2 };
         this.mqttConnection.publish(this.partyPubTopic, squareNb, qos);
     }
@@ -359,17 +376,32 @@ class MQTT {
     }
 }
 
+/**
+ * @property **userName**
+ * @property **partyId**
+ * @property **localSymbol**
+ * @property **remoteSymbol**
+ * @property **opponentUserName**
+ * @property **localScore**
+ * @property **opponentScore**
+ */
 class Game {
     /**
-     *
+     * Instantiates UI (UI dsplays "start menu" on intantiation) and listen to clicks on "start menu"
      * @param {HTMLDivElement} boardContainer
      */
     constructor(boardContainer) {
-        this.boardContainer = boardContainer;
         this.ui = new UI(boardContainer);
         this.uiAttachStartMenuEventHandler();
     }
 
+    /**
+     * ### UI
+     * Handeles clicks on "start menu":
+     *
+     * - Initiate a party
+     * - Join a party
+     */
     uiAttachStartMenuEventHandler() {
         this.ui.startBtn.addEventListener("click", (e) => {
             this.initParty();
@@ -379,30 +411,20 @@ class Game {
         });
     }
 
+    /**
+     * ### UI
+     * Handeles clicks on "Game screen" (XOs grid)
+     */
     uiAttachXOGridBoardEventHandler() {
         this.ui.xoGridBoard.addEventListener("click", (e) => {
-            if (
-                this.opponentUserName !== "unknown*" &&
-                e.target.hasAttribute("xo-gamesquare") &&
-                this.round.turnState === "unlocked"
-            ) {
-                const msg = e.target.id[14];
-                if (this.round.isPlayedTile(msg)) return;
-                this.roundLockTurn();
-                this.mqtt.pubXO(msg);
-            }
+            this.playTurn(e.target);
         });
     }
 
-    /**
-     *
-     * @param {HTMLDivElement} boardContainer
-     */
     initParty() {
         this.setUserName();
         this.setPartyIdOnInit();
         this.setSymbols("X", "O");
-        this.setOpponentUserName("unknown*");
         this.round = new Round(this.localSymbol, this.remoteSymbol);
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
@@ -417,7 +439,6 @@ class Game {
         this.setUserName();
         this.setPartyIdOnJoin();
         this.setSymbols("O", "X");
-        this.setOpponentUserName("unknown*");
         this.round = new Round(this.localSymbol, this.remoteSymbol);
         this.round.initRoundState();
         this.mqtt = new MQTT(this.userName, this.partyId);
@@ -429,36 +450,99 @@ class Game {
         this.initscores();
     }
 
+    /**
+     * Called on PARTY init() or join()
+     * Get value from UI "start menu" "name input field" and asigns it to PARTY username
+     * if value from "name input field" is "EMPTY" a random name will be picked from nameSrc
+     */
     setUserName() {
         const input = this.ui.nameInputField.value;
-        if (input === "" || input === "unknown*") {
-            const nameSrc = ["Lloyd_Gross", "Michel_Scarn", "Bestich_Manch"];
+        if (input === "") {
+            const nameSrc = [
+                "Lloyd_Gross",
+                "Michel_Scarn",
+                "Bestich_Manch",
+                "Jim_Halpert",
+                "Pam_Beesly",
+                "Dwigth_K_Shrute",
+                "Erin",
+                "Daryl",
+                "Holly",
+            ];
             this.userName = nameSrc[Math.floor(Math.random() * nameSrc.length)];
         } else {
             this.userName = input;
         }
     }
 
+    /**
+     * Called only on PARTY init()
+     * Defining (generating) the party ID
+     */
     setPartyIdOnInit() {
         this.partyId = this.userName + Date.now();
     }
 
+    /**
+     * Called only on PARTY join()
+     * Get value from UI "start menu" "party ID input field" and asigns it to PARTY party ID
+     */
     setPartyIdOnJoin() {
         this.partyId = this.ui.partyIdInputField.value;
     }
 
+    /**
+     * Called on PARTY
+     * - init() XO
+     * - join() OX
+     *
+     * @param {string} local
+     * @param {string} remote
+     */
     setSymbols(local, remote) {
         this.localSymbol = local;
         this.remoteSymbol = remote;
     }
 
+    /**
+     * Called only once during handshake (opponentUserName used to be assumed as undefined)
+     * opponentUserName is used to define to which player played the current turn at XO msg reception
+     * @param {string} opponentUserName
+     */
     setOpponentUserName(opponentUserName) {
+        if (!(opponentUserName.length > 0))
+            throw "opponent name must be a non-empty string";
         this.opponentUserName = opponentUserName;
     }
 
+    /**
+     * Called on PARTY init() or join()
+     * The properties indicate how many rounds each player won during a party
+     */
     initscores() {
         this.opponentScore = 0;
         this.localScore = 0;
+    }
+
+    playTurn(target) {
+        /**
+         * - known opponent (done handshake)
+         * - clickable square
+         * - allowed to play
+         */
+        if (
+            this.opponentUserName !== undefined &&
+            target.hasAttribute("xo-gamesquare") &&
+            this.round.turnState === "unlocked"
+        ) {
+            // "xo-gamesquare-X"[14] = X AND X=[0-8]
+            const msg = target.id[14];
+            if (!(msg >= 0 && msg <= 8))
+                throw "square number is limited inside [0-8]";
+            if (this.round.isPlayedTile(msg)) return;
+            this.roundLockTurn();
+            this.mqtt.pubXO(msg);
+        }
     }
 
     roundLockTurn() {
@@ -500,7 +584,7 @@ class Game {
             }
             // - - Opponent's play
             else if (
-                this.opponentUserName !== "unknown*" &&
+                this.opponentUserName !== undefined &&
                 sender === this.opponentUserName &&
                 !isNaN(msg)
             ) {
@@ -518,15 +602,18 @@ class Game {
             ) {
                 this.mqtt.hiSent = true;
             } else if (
-                this.opponentUserName === "unknown*" &&
+                this.opponentUserName === undefined &&
                 msg === "hi" &&
                 sender
             ) {
+                // set change
                 this.setOpponentUserName(sender);
+                // display the change
                 this.ui.displayOpponentPlayerCrad(
                     this.opponentUserName,
                     this.remoteSymbol
                 );
+                // conclude the handshake
                 this.mqtt.pubHi();
             }
         });

@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@600&display=swap");
+
 * {
     padding: 0;
     margin: 0;
@@ -26,7 +28,7 @@ main {
     max-width: 400px;
     height: 100vh;
     max-height: 820px;
-    background: cadetblue;
+    background: #00a396;
 }
 
 #xo-startMenu {
@@ -48,7 +50,7 @@ main {
     flex-flow: row wrap;
     justify-content: space-around;
     padding: 2rem 3px;
-    background: #eee;
+    background: #09ba79;
     box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px,
         rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
     border-radius: 8px;
@@ -62,7 +64,7 @@ main {
     border: none;
     border-radius: 0;
     margin-bottom: 0.8rem;
-    border: 3px solid hsl(182, 25%, 35%);
+    border: 3px solid #a36608;
     border-radius: 3px;
 }
 
@@ -86,15 +88,15 @@ main {
     border-radius: 0;
     margin-bottom: 0.8rem;
     font-weight: 600;
-    background: hsl(182, 25%, 35%);
-    color: #fff;
+    background: #f09b18;
+    color: #222;
     border-radius: 3px;
 }
 
 #xo-joinPartyMenu .btn:hover,
 #xo-startPartyMenu .btn:hover {
-    background: hsl(182, 25%, 60%);
-    color: #333;
+    background: #f01f18;
+    color: #222;
 }
 
 #xo-joinPartyMenu .long-btn,
@@ -122,7 +124,7 @@ main {
     gap: 0.2rem;
     grid-template-rows: repeat(3, 100px);
     grid-template-columns: repeat(3, 100px);
-    background: rgba(255, 255, 255, 0.253);
+    background: rgba(255, 255, 255, 0.021);
     margin: 1rem auto;
     max-width: fit-content;
     max-width: max-content;
@@ -131,9 +133,11 @@ main {
 #xo-gridBoard > div {
     font-size: 80px;
     font-weight: 550;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-family: "Quicksand", sans-serif;
 }
 
 #xo-gridBoard > div {
