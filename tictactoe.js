@@ -10,7 +10,7 @@
  * @property **localScoreElement**
  * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
  * @property **opponentScoreElement**
- * @property **gameSquaresIdPrfix**
+ * @property **gameSquaresIdPrefix**
  *
  */
 class UI {
@@ -20,7 +20,7 @@ class UI {
      */
     constructor(boardContainer) {
         this.boardContainer = boardContainer;
-        this.gameSquaresIdPrfix = "xo-gamesquare-";
+        this.gameSquaresIdPrefix = "#xo-gamesquare-";
 
         this.drawStartMenu();
     }
@@ -63,7 +63,7 @@ class UI {
     appentNameInputField(parent) {
         this.nameInputField = document.createElement("input");
         this.nameInputField.type = "text";
-        this.nameInputField.placeholder = "player Name";
+        this.nameInputField.placeholder = "Player Name";
         this.nameInputField.classList.add("input", "long-input");
         parent.appendChild(this.nameInputField);
     }
@@ -173,22 +173,37 @@ class UI {
     }
 
     displayPartyCodeForOwner(partyID) {
-        const inv = document.createElement("p");
+        const inv = document.createElement("div");
         inv.classList.add("join-code");
         inv.innerText = "Share the party code with one friend: " + partyID;
 
+        this.copyAction = document.createElement("p");
+        this.copyAction.innerText = "COPY CODE";
+        this.copyAction.classList.add("action-text");
+
+        inv.appendChild(this.copyAction);
         this.opponentElement.appendChild(inv);
     }
 
     drawSymbol(target, symbol) {
         const targetElement = document.querySelector(
-            "#" + this.gameSquaresIdPrfix + target
+            this.gameSquaresIdPrefix + target
         );
         targetElement.innerText = symbol;
-        console.log(symbol);
-        console.log(targetElement);
         if (symbol === "X") targetElement.style.color = "#1580D6";
         else if (symbol === "O") targetElement.style.color = "#D61C15";
+    }
+
+    /**
+     *
+     * @param {Array} winTiles
+     */
+    highlightsWinTiles(winTiles) {
+        winTiles.forEach((square) => {
+            document.querySelector(
+                this.gameSquaresIdPrefix + square
+            ).style.background = "#0f0";
+        });
     }
 }
 
@@ -219,31 +234,39 @@ class Round {
         const g = this.gameState;
         // horizontal
         if (g[0] === g[1] && g[0] === g[2]) {
+            this.winTiles = [0, 1, 2];
             if (g[0] === this.localRoundSymbol) this.win();
             else if (g[0] === this.remoteRoundSymbol) this.lose();
         } else if (g[3] === g[4] && g[3] === g[5]) {
+            this.winTiles = [3, 4, 5];
             if (g[3] === this.localRoundSymbol) this.win();
             else if (g[3] === this.remoteRoundSymbol) this.lose();
         } else if (g[6] === g[7] && g[6] === g[8]) {
+            this.winTiles = [6, 7, 8];
             if (g[6] === this.localRoundSymbol) this.win();
             else if (g[6] === this.remoteRoundSymbol) this.lose();
         }
         // vertical
         else if (g[0] === g[3] && g[0] === g[6]) {
+            this.winTiles = [0, 3, 6];
             if (g[0] === this.localRoundSymbol) this.win();
             else if (g[0] === this.remoteRoundSymbol) this.lose();
         } else if (g[1] === g[4] && g[1] === g[7]) {
+            this.winTiles = [1, 4, 7];
             if (g[1] === this.localRoundSymbol) this.win();
             else if (g[1] === this.remoteRoundSymbol) this.lose();
         } else if (g[2] === g[5] && g[2] === g[8]) {
+            this.winTiles = [2, 5, 8];
             if (g[2] === this.localRoundSymbol) this.win();
             else if (g[2] === this.remoteRoundSymbol) this.lose();
         }
         // Diagonal
         else if (g[0] === g[4] && g[0] === g[8]) {
+            this.winTiles = [0, 4, 8];
             if (g[0] === this.localRoundSymbol) this.win();
             else if (g[0] === this.remoteRoundSymbol) this.lose();
         } else if (g[2] === g[4] && g[2] === g[6]) {
+            this.winTiles = [2, 4, 6];
             if (g[2] === this.localRoundSymbol) this.win();
             else if (g[2] === this.remoteRoundSymbol) this.lose();
         }
@@ -415,9 +438,12 @@ class Game {
      * ### UI
      * Handeles clicks on "Game screen" (XOs grid)
      */
-    uiAttachXOGridBoardEventHandler() {
+    uiAttachGameScreenEventHandler() {
         this.ui.xoGridBoard.addEventListener("click", (e) => {
             this.playTurn(e.target);
+        });
+        this.ui.copyAction.addEventListener("click", () => {
+            this.copyPartyId();
         });
     }
 
@@ -430,12 +456,13 @@ class Game {
         this.mqtt = new MQTT(this.userName, this.partyId);
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.ui.drawPartyScreen(this.userName, this.localSymbol, this.partyId);
-        this.uiAttachXOGridBoardEventHandler();
+        this.uiAttachGameScreenEventHandler();
         this.roundUnlockTurn();
         this.initscores();
     }
 
     joinParty() {
+        if (this.ui.partyIdInputField.value.length < 13) return;
         this.setUserName();
         this.setPartyIdOnJoin();
         this.setSymbols("O", "X");
@@ -445,7 +472,7 @@ class Game {
         this.mqttOnMsgEventHandler(this.mqtt.mqttConnection);
         this.mqtt.pubHi();
         this.ui.drawPartyScreen(this.userName, this.localSymbol, undefined);
-        this.uiAttachXOGridBoardEventHandler();
+        this.uiAttachGameScreenEventHandler();
         this.roundLockTurn();
         this.initscores();
     }
@@ -520,8 +547,34 @@ class Game {
      * The properties indicate how many rounds each player won during a party
      */
     initscores() {
-        this.opponentScore = 0;
         this.localScore = 0;
+        this.opponentScore = 0;
+    }
+
+    /**
+     * Called in roundEnd() to update scores values properties and their display
+     * @param {string} result
+     */
+    updateScore(result) {
+        if (result === "win") {
+            this.localScore++;
+            this.ui.localScoreElement.innerHTML = `Score: <b>${this.localScore}</b>`;
+        } else if (result === "loss") {
+            this.opponentScore++;
+            this.ui.opponentScoreElement.innerHTML = `Score: <b>${this.opponentScore}</b>`;
+        }
+    }
+
+    /**
+     * @author www.30secondsofcode.org/blog/s/copy-text-to-clipboard-with-javascript
+     */
+    copyPartyId() {
+        const el = document.createElement("textarea");
+        el.value = this.partyId;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
     }
 
     playTurn(target) {
@@ -579,8 +632,7 @@ class Game {
             if (sender === this.userName && !isNaN(msg)) {
                 this.ui.drawSymbol(msg, this.localSymbol);
                 this.round.updateRoundState(msg, this.localSymbol);
-                if (this.round.roundResult !== undefined)
-                    this.roundEnd(this.round.roundResult);
+                if (this.round.roundResult !== undefined) this.roundEnd();
             }
             // - - Opponent's play
             else if (
@@ -591,8 +643,7 @@ class Game {
                 this.ui.drawSymbol(msg, this.remoteSymbol);
                 this.round.updateRoundState(msg, this.remoteSymbol);
                 this.roundUnlockTurn();
-                if (this.round.roundResult !== undefined)
-                    this.roundEnd(this.round.roundResult);
+                if (this.round.roundResult !== undefined) this.roundEnd();
             }
             // - Handshake
             else if (
@@ -619,20 +670,36 @@ class Game {
         });
     }
 
-    roundEnd(result) {
-        if (result === "loss") {
-            this.opponentScore++;
-            this.ui.opponentScoreElement.innerHTML = `Score: <b>${this.opponentScore}</b>`;
+    /**
+     * Called after round.updateRoundState() because:
+     *
+     * round.roundResult isn't undefined => win | loss | tie
+     *
+     * First hightligh win tiles if the result isn't a tie
+     *
+     */
+    roundEnd() {
+        if (this.round.winTiles !== undefined) {
+            this.ui.highlightsWinTiles(this.round.winTiles);
+        }
+
+        if (this.round.roundResult === "loss") {
+            this.updateScore("loss");
             this.roundLockTurn();
-        } else if (result === "win") {
-            this.localScore++;
-            this.ui.localScoreElement.innerHTML = `Score: <b>${this.localScore}</b>`;
+        } else if (this.round.roundResult === "win") {
+            this.updateScore("win");
             this.roundUnlockTurn();
         }
+
         this.round.roundResult = undefined;
-        this.ui.xoGridBoard.childNodes.forEach((child) => {
-            child.innerHTML = "";
-        });
+        this.round.winTiles = undefined;
+
+        setTimeout(() => {
+            this.ui.xoGridBoard.childNodes.forEach((child) => {
+                child.innerHTML = "";
+                child.style.background = "#fff";
+            });
+        }, 800);
     }
 }
 

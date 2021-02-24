@@ -174,3 +174,14 @@ main {
     padding: 0.2rem;
     background: rgb(255, 161, 98);
 }
+.action-text,
+#xo-partyScreen .action-text {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    margin: 0 0.2rem;
+    border-radius: 5px;
+    color: #f09b18;
+    background: #0999ba;
+    cursor: pointer;
+    font-weight: bolder;
+}
