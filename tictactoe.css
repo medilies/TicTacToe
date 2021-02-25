@@ -194,6 +194,7 @@ main {
 .action-text,
 #xo-partyScreen .action-text {
     display: inline-block;
+    width: fit-content;
     padding: 0.2rem 0.4rem;
     margin: 0 0.2rem;
     border-radius: 5px;
@@ -203,12 +204,19 @@ main {
     font-weight: bolder;
 }
 
+.quit-btn,
+#xo-partyScreen .quit-btn {
+    color: #f01f18;
+    background: #f09a18bb;
+    margin: 1rem 1rem 0 1rem;
+}
+
 #xo-about {
-    background: #fff8;
+    background: #f09a18bb;
     position: absolute;
     top: 0;
     right: 0;
-    bottom: 0;
+    height: 100%;
     left: 0;
     display: none;
 }
@@ -244,5 +252,5 @@ main {
 
 .about-btn {
     position: absolute;
-    bottom: 10px;
+    top: calc(100vh - 35px);
 }

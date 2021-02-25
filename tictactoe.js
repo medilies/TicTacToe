@@ -67,6 +67,9 @@ class UI {
         this.nameInputField.placeholder = "Player Name";
         this.nameInputField.classList.add("input", "long-input");
         parent.appendChild(this.nameInputField);
+        // Stored name
+        if (localStorage.getItem("userName") !== null)
+            this.nameInputField.value = localStorage.getItem("userName");
     }
 
     appendCreatePartyBtn(parent) {
@@ -103,6 +106,7 @@ class UI {
         this.appendlocalPlayerCard(partyScreen, userName, Localsymbol);
         this.appendXOGridBoard(partyScreen);
         this.appendEmptyOpponentArea(partyScreen);
+        this.appendQuitPartyBtn(partyScreen);
 
         if (partyId !== undefined) this.displayPartyCodeForOwner(partyId);
     }
@@ -141,6 +145,13 @@ class UI {
         this.opponentElement = document.createElement("div");
         this.opponentElement.classList.add("player-card");
         parent.appendChild(this.opponentElement);
+    }
+
+    appendQuitPartyBtn(parent) {
+        this.quitBtn = document.createElement("p");
+        this.quitBtn.innerText = "Quit";
+        this.quitBtn.classList.add("action-text", "quit-btn");
+        parent.appendChild(this.quitBtn);
     }
 
     displayOpponentPlayerCrad(opponentName, opponentSymbol) {
@@ -482,13 +493,17 @@ class Game {
      * Handeles clicks on "Game screen" (XOs grid)
      */
     uiAttachGameScreenEventHandler() {
+        this.ui.quitBtn.addEventListener("click", () => {
+            location.reload();
+        });
         this.ui.xoGridBoard.addEventListener("click", (e) => {
             this.playTurn(e.target);
         });
-        if (this.localSymbol === "X")
+        if (this.localSymbol === "X") {
             this.ui.copyAction.addEventListener("click", () => {
                 this.copyPartyId();
             });
+        }
     }
 
     initParty() {
@@ -542,6 +557,7 @@ class Game {
             ];
             this.userName = nameSrc[Math.floor(Math.random() * nameSrc.length)];
         } else {
+            localStorage.setItem("userName", input);
             this.userName = input;
         }
     }
