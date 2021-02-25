@@ -23,6 +23,7 @@ class UI {
         this.gameSquaresIdPrefix = "#xo-gamesquare-";
 
         this.drawStartMenu();
+        this.about();
     }
 
     //**********************************************
@@ -214,6 +215,40 @@ class UI {
             "Your opponent left the party or disconnected!";
 
         this.xoGridBoard.appendChild(disconnectAlert);
+    }
+
+    //**********************************************
+    // ABOUT
+    //**********************************************
+    about() {
+        const body = document.querySelector("main");
+
+        const aboutContainer = document.createElement("div");
+        aboutContainer.id = "xo-about";
+
+        const aboutShowBtn = document.createElement("p");
+        aboutShowBtn.innerText = "About";
+        aboutShowBtn.classList.add("about-btn", "menu-btn");
+
+        const about = document.createElement("div");
+        about.innerHTML =
+            "<p>Copyrigth 2021 medilies</p>" +
+            "<a href='https://github.com/medilies'>Github</a> - " +
+            "<a href='https://www.linkedin.com/in/medilies/'>Linkedin</a>" +
+            "<p>This game was developped as a training and for FUN</p>" +
+            "Get in touch if u wanna request my IT services";
+
+        aboutContainer.appendChild(about);
+        body.appendChild(aboutContainer);
+        body.appendChild(aboutShowBtn);
+
+        aboutShowBtn.addEventListener("click", () => {
+            aboutContainer.style.display = "block";
+        });
+
+        aboutContainer.addEventListener("click", (e) => {
+            if (e.target !== about) aboutContainer.style.display = "none";
+        });
     }
 }
 

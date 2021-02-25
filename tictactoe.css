@@ -202,3 +202,47 @@ main {
     cursor: pointer;
     font-weight: bolder;
 }
+
+#xo-about {
+    background: #fff8;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: none;
+}
+
+#xo-about > div:first-child {
+    background: #96ffd8ee;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    line-height: 145%;
+    width: 310px;
+    padding: 3rem 1rem;
+    border-radius: 2rem;
+    margin: 200px auto 0 auto;
+}
+
+#xo-about > div:first-child > * {
+    margin-bottom: 0.9rem;
+}
+
+.menu-btn {
+    padding: 0.2rem 1.5rem;
+    margin: 0 0.2rem;
+    border-radius: 4rem;
+    color: #f09b18;
+    background: #09ba79;
+    cursor: pointer;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-weight: bolder;
+    font-size: 1.3rem;
+}
+
+.about-btn {
+    position: absolute;
+    bottom: 10px;
+}
