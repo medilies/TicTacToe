@@ -120,6 +120,7 @@ main {
 }
 
 #xo-gridBoard {
+    position: relative;
     display: grid;
     gap: 0.2rem;
     grid-template-rows: repeat(3, 100px);
@@ -174,6 +175,22 @@ main {
     padding: 0.2rem;
     background: rgb(255, 161, 98);
 }
+
+.alert,
+#xo-partyScreen .alert {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    font-size: 2rem;
+    text-align: center;
+    border: #c22 3px solid;
+    border-radius: 5px;
+    padding: 0.2rem;
+    background: rgb(255, 146, 146);
+}
+
 .action-text,
 #xo-partyScreen .action-text {
     display: inline-block;

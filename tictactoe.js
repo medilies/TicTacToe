@@ -199,11 +199,21 @@ class UI {
      * @param {Array} winTiles
      */
     highlightsWinTiles(winTiles) {
-        winTiles.forEach((square) => {
-            document.querySelector(
-                this.gameSquaresIdPrefix + square
-            ).style.background = "#0f0";
-        });
+        if (winTiles !== undefined)
+            winTiles.forEach((square) => {
+                document.querySelector(
+                    this.gameSquaresIdPrefix + square
+                ).style.background = "#0f0";
+            });
+    }
+
+    signalOpponentDisconnect() {
+        const disconnectAlert = document.createElement("div");
+        disconnectAlert.classList.add("alert");
+        disconnectAlert.innerText =
+            "Your opponent left the party or disconnected!";
+
+        this.xoGridBoard.appendChild(disconnectAlert);
     }
 }
 
@@ -218,6 +228,16 @@ class Round {
     constructor(localRoundSymbol, remoteRoundSymbol) {
         this.localRoundSymbol = localRoundSymbol;
         this.remoteRoundSymbol = remoteRoundSymbol;
+        this.winningCombinations = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6],
+        ];
     }
 
     initRoundState() {
@@ -227,53 +247,35 @@ class Round {
 
     updateRoundState(target, symbole) {
         this.gameState[target] = symbole;
-        this.checkRoundWinner();
+        this.checkRoundWinner(symbole);
     }
 
-    checkRoundWinner() {
-        const g = this.gameState;
-        // horizontal
-        if (g[0] === g[1] && g[0] === g[2]) {
-            this.winTiles = [0, 1, 2];
-            if (g[0] === this.localRoundSymbol) this.win();
-            else if (g[0] === this.remoteRoundSymbol) this.lose();
-        } else if (g[3] === g[4] && g[3] === g[5]) {
-            this.winTiles = [3, 4, 5];
-            if (g[3] === this.localRoundSymbol) this.win();
-            else if (g[3] === this.remoteRoundSymbol) this.lose();
-        } else if (g[6] === g[7] && g[6] === g[8]) {
-            this.winTiles = [6, 7, 8];
-            if (g[6] === this.localRoundSymbol) this.win();
-            else if (g[6] === this.remoteRoundSymbol) this.lose();
-        }
-        // vertical
-        else if (g[0] === g[3] && g[0] === g[6]) {
-            this.winTiles = [0, 3, 6];
-            if (g[0] === this.localRoundSymbol) this.win();
-            else if (g[0] === this.remoteRoundSymbol) this.lose();
-        } else if (g[1] === g[4] && g[1] === g[7]) {
-            this.winTiles = [1, 4, 7];
-            if (g[1] === this.localRoundSymbol) this.win();
-            else if (g[1] === this.remoteRoundSymbol) this.lose();
-        } else if (g[2] === g[5] && g[2] === g[8]) {
-            this.winTiles = [2, 5, 8];
-            if (g[2] === this.localRoundSymbol) this.win();
-            else if (g[2] === this.remoteRoundSymbol) this.lose();
-        }
-        // Diagonal
-        else if (g[0] === g[4] && g[0] === g[8]) {
-            this.winTiles = [0, 4, 8];
-            if (g[0] === this.localRoundSymbol) this.win();
-            else if (g[0] === this.remoteRoundSymbol) this.lose();
-        } else if (g[2] === g[4] && g[2] === g[6]) {
-            this.winTiles = [2, 4, 6];
-            if (g[2] === this.localRoundSymbol) this.win();
-            else if (g[2] === this.remoteRoundSymbol) this.lose();
+    checkRoundWinner(symbol) {
+        if (this.checkWin(symbol)) {
+            if (symbol === this.localRoundSymbol) this.win();
+            else if (symbol === this.remoteRoundSymbol) this.lose();
         }
         // TIE
-        else if (!g.includes("")) {
+        else if (!this.gameState.includes("")) {
             this.tie();
         }
+    }
+
+    /**
+     * @author github.com/WebDevSimplified/JavaScript-Tic-Tac-Toe/blob/master/script.js
+     * @param {string} symbol
+     */
+    checkWin(symbol) {
+        return this.winningCombinations.some((combination, i) => {
+            if (
+                combination.every((index) => {
+                    return this.gameState[index] === symbol;
+                })
+            ) {
+                this.winTiles = this.winningCombinations[i];
+                return true;
+            }
+        });
     }
 
     win() {
@@ -327,9 +329,9 @@ class MQTT {
         this.mqttLogs = true;
         this.userName = userName;
         this.partyId = partyId;
-        this.connect();
         this.setPartySubTopic();
         this.setPartyPubTopic();
+        this.connect();
         this.mqttCallbacks();
     }
 
@@ -341,6 +343,12 @@ class MQTT {
             username: this.userName,
             clientId: this.userName,
             path: "/mqtt",
+            will: {
+                topic: this.partyPubTopic,
+                payload: "rip",
+                qos: 2,
+                retain: true,
+            },
         });
     }
 
@@ -402,8 +410,8 @@ class MQTT {
 /**
  * @property **userName**
  * @property **partyId**
- * @property **localSymbol**
- * @property **remoteSymbol**
+ * @property **localSymbol** X|O (X indicates also party creature)
+ * @property **remoteSymbol** X|O
  * @property **opponentUserName**
  * @property **localScore**
  * @property **opponentScore**
@@ -442,9 +450,10 @@ class Game {
         this.ui.xoGridBoard.addEventListener("click", (e) => {
             this.playTurn(e.target);
         });
-        this.ui.copyAction.addEventListener("click", () => {
-            this.copyPartyId();
-        });
+        if (this.localSymbol === "X")
+            this.ui.copyAction.addEventListener("click", () => {
+                this.copyPartyId();
+            });
     }
 
     initParty() {
@@ -458,7 +467,7 @@ class Game {
         this.ui.drawPartyScreen(this.userName, this.localSymbol, this.partyId);
         this.uiAttachGameScreenEventHandler();
         this.roundUnlockTurn();
-        this.initscores();
+        this.initScores();
     }
 
     joinParty() {
@@ -474,7 +483,7 @@ class Game {
         this.ui.drawPartyScreen(this.userName, this.localSymbol, undefined);
         this.uiAttachGameScreenEventHandler();
         this.roundLockTurn();
-        this.initscores();
+        this.initScores();
     }
 
     /**
@@ -546,7 +555,7 @@ class Game {
      * Called on PARTY init() or join()
      * The properties indicate how many rounds each player won during a party
      */
-    initscores() {
+    initScores() {
         this.localScore = 0;
         this.opponentScore = 0;
     }
@@ -666,6 +675,10 @@ class Game {
                 );
                 // conclude the handshake
                 this.mqtt.pubHi();
+            }
+            // death
+            else if (msg === "rip" && sender !== this.userName) {
+                this.ui.signalOpponentDisconnect();
             }
         });
     }
