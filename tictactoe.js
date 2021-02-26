@@ -11,6 +11,7 @@
  * @property **xoGridBoard** - REQUIRES click event handler: to locate which gamesquare was targeted
  * @property **opponentScoreElement**
  * @property **gameSquaresIdPrefix**
+ * @property **quitBtn**
  *
  */
 class UI {
@@ -468,6 +469,14 @@ class Game {
      * @param {HTMLDivElement} boardContainer
      */
     constructor(boardContainer) {
+        /**
+         * @author stackoverflow.com/a/33335971/11083033
+         */
+        if (Game._instance) {
+            throw new Error("Game already has an instance!!!");
+        }
+        Game._instance = this;
+
         this.ui = new UI(boardContainer);
         this.uiAttachStartMenuEventHandler();
     }
@@ -769,4 +778,4 @@ class Game {
 
 const board = document.querySelector("#xo-container");
 
-const game = new Game(board);
+new Game(board);
